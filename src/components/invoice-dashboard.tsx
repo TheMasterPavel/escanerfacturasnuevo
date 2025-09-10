@@ -17,16 +17,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
 import {
-  CircleDollarSign,
-  FileText,
   FileClock,
-  Upload,
   FileDown,
+  FileText,
+  FileX,
   Loader2,
   Trash2,
-  FileX,
+  Upload,
   Wallet,
 } from "lucide-react";
 
@@ -65,11 +63,11 @@ export default function InvoiceDashboard() {
       reader.onload = async () => {
         const pdfDataUri = reader.result as string;
         try {
-          const newInvoice = await processInvoice(pdfDataUri, file.name);
-          setInvoices((prev) => [newInvoice, ...prev]);
+          const newInvoices = await processInvoice(pdfDataUri, file.name);
+          setInvoices((prev) => [...newInvoices, ...prev]);
           toast({
-            title: "Factura procesada",
-            description: "Los datos han sido extraídos exitosamente.",
+            title: "Factura(s) procesada(s)",
+            description: `Se han extraído ${newInvoices.length} factura(s) exitosamente.`,
           });
         } catch (error) {
             if (error instanceof Error) {
@@ -93,20 +91,6 @@ export default function InvoiceDashboard() {
         description: "No se pudo leer el archivo.",
       });
     }
-  };
-
-  const handleUpdateInvoice = (
-    id: string,
-    field: keyof Omit<Invoice, "id" | "fileName">,
-    value: string | number
-  ) => {
-    setInvoices((prev) =>
-      prev.map((inv) =>
-        inv.id === id
-          ? { ...inv, [field]: { ...inv[field], value: value } }
-          : inv
-      )
-    );
   };
   
   const handleDeleteInvoice = (id: string) => {
@@ -190,47 +174,28 @@ export default function InvoiceDashboard() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[180px]">Proveedor</TableHead>
+                    <TableHead className="w-[200px]">Proveedor</TableHead>
                     <TableHead className="w-[120px]">Fecha</TableHead>
                     <TableHead>Concepto</TableHead>
-                    <TableHead className="w-[120px] text-right">Importe</TableHead>
-                    <TableHead className="w-[180px]">Archivo</TableHead>
+                    <TableHead className="w-[150px] text-right">Importe</TableHead>
                     <TableHead className="w-[50px] text-center">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {invoices.map((invoice) => (
-                    <TableRow key={invoice.id}>
-                      <TableCell>
-                        <Input
-                          value={invoice.supplier.value}
-                          onChange={(e) => handleUpdateInvoice(invoice.id, "supplier", e.target.value)}
-                          className={cn({"ring-2 ring-accent": invoice.supplier.uncertain})}
-                        />
+                    <TableRow key={invoice.id} className={cn({'bg-accent/20 hover:bg-accent/30': invoice.supplier.uncertain || invoice.date.uncertain || invoice.concept.uncertain || invoice.amount.uncertain})}>
+                      <TableCell className={cn('font-medium', {'text-accent-foreground ring-1 ring-accent rounded-md': invoice.supplier.uncertain})}>
+                        {invoice.supplier.value}
                       </TableCell>
-                      <TableCell>
-                        <Input
-                          value={invoice.date.value}
-                          onChange={(e) => handleUpdateInvoice(invoice.id, "date", e.target.value)}
-                          className={cn({ "ring-2 ring-accent": invoice.date.uncertain })}
-                        />
+                      <TableCell className={cn({'text-accent-foreground ring-1 ring-accent rounded-md': invoice.date.uncertain})}>
+                        {invoice.date.value}
                       </TableCell>
-                      <TableCell>
-                        <Input
-                          value={invoice.concept.value}
-                          onChange={(e) => handleUpdateInvoice(invoice.id, "concept", e.target.value)}
-                          className={cn({ "ring-2 ring-accent": invoice.concept.uncertain })}
-                        />
+                      <TableCell className={cn({'text-accent-foreground ring-1 ring-accent rounded-md': invoice.concept.uncertain})}>
+                        {invoice.concept.value}
                       </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={invoice.amount.value}
-                          onChange={(e) => handleUpdateInvoice(invoice.id, "amount", parseFloat(e.target.value) || 0)}
-                          className={cn("text-right", { "ring-2 ring-accent": invoice.amount.uncertain })}
-                        />
+                      <TableCell className={cn('text-right font-mono', {'text-accent-foreground ring-1 ring-accent rounded-md': invoice.amount.uncertain})}>
+                        {invoice.amount.value.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}
                       </TableCell>
-                      <TableCell className="truncate text-sm text-muted-foreground">{invoice.fileName}</TableCell>
                        <TableCell className="text-center">
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteInvoice(invoice.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />

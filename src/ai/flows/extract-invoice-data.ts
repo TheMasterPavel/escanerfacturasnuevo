@@ -20,12 +20,14 @@ const ExtractInvoiceDataInputSchema = z.object({
 });
 export type ExtractInvoiceDataInput = z.infer<typeof ExtractInvoiceDataInputSchema>;
 
-const ExtractInvoiceDataOutputSchema = z.object({
+const InvoiceDetailSchema = z.object({
   supplier: z.string().describe('The name of the supplier.'),
   date: z.string().describe('The date of the invoice.'),
   concept: z.string().describe('A description of the invoice.'),
   amount: z.number().describe('The total amount of the invoice.'),
 });
+
+const ExtractInvoiceDataOutputSchema = z.array(InvoiceDetailSchema);
 export type ExtractInvoiceDataOutput = z.infer<typeof ExtractInvoiceDataOutputSchema>;
 
 export async function extractInvoiceData(input: ExtractInvoiceDataInput): Promise<ExtractInvoiceDataOutput> {
@@ -36,9 +38,9 @@ const prompt = ai.definePrompt({
   name: 'extractInvoiceDataPrompt',
   input: {schema: ExtractInvoiceDataInputSchema},
   output: {schema: ExtractInvoiceDataOutputSchema},
-  prompt: `You are an expert accounting assistant. Extract the key information from the invoice provided.
+  prompt: `You are an expert accounting assistant. Extract the key information from all invoices found in the document provided.
 
-  Return the supplier, date, concept, and amount.
+  For each invoice, return the supplier, date, concept, and amount. If the document contains multiple invoices, return an array of objects, one for each invoice.
 
   Invoice: {{media url=pdfDataUri}}`,
 });
