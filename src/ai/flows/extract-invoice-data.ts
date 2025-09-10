@@ -8,8 +8,8 @@
  * - ExtractInvoiceDataOutput - The return type for the extractInvoiceData function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
 
 const ExtractInvoiceDataInputSchema = z.object({
   pdfDataUri: z
@@ -20,15 +20,20 @@ const ExtractInvoiceDataInputSchema = z.object({
 });
 export type ExtractInvoiceDataInput = z.infer<typeof ExtractInvoiceDataInputSchema>;
 
-const InvoiceDetailSchema = z.object({
-  supplier: z.string().describe('The name of the supplier.'),
-  date: z.string().describe('The date of the invoice.'),
-  concept: z.string().describe('A description of the invoice.'),
-  amount: z.number().describe('The total amount of the invoice.'),
+const InvoiceSchema = z.object({
+    proveedor: z.string().describe('The supplier name. If not found, return "".'),
+    fecha: z.string().describe('The invoice date in YYYY-MM-DD format. If not found, return "".'),
+    concepto: z.string().describe('A brief description of the invoice content. If not found, return "".'),
+    importe: z.number().describe('The total amount of the invoice. If not found, return 0.'),
+    missingFields: z.array(z.string()).optional().describe('An array of field names that could not be extracted with high confidence.'),
 });
 
-const ExtractInvoiceDataOutputSchema = z.array(InvoiceDetailSchema);
+const ExtractInvoiceDataOutputSchema = z.object({
+    facturas: z.array(InvoiceSchema).describe('An array of extracted invoices. If no invoices are found or an error occurs, return an empty array.'),
+});
+
 export type ExtractInvoiceDataOutput = z.infer<typeof ExtractInvoiceDataOutputSchema>;
+
 
 export async function extractInvoiceData(input: ExtractInvoiceDataInput): Promise<ExtractInvoiceDataOutput> {
   return extractInvoiceDataFlow(input);
@@ -36,13 +41,31 @@ export async function extractInvoiceData(input: ExtractInvoiceDataInput): Promis
 
 const prompt = ai.definePrompt({
   name: 'extractInvoiceDataPrompt',
-  input: {schema: ExtractInvoiceDataInputSchema},
-  output: {schema: ExtractInvoiceDataOutputSchema},
-  prompt: `You are an expert accounting assistant. Extract the key information from all invoices found in the document provided.
+  input: { schema: ExtractInvoiceDataInputSchema },
+  output: { schema: ExtractInvoiceDataOutputSchema },
+  prompt: `You are an expert accounting assistant specialized in extracting structured data from PDF documents.
+  Your task is to analyze the provided PDF and extract information for ALL invoices contained within it.
 
-  For each invoice, return the supplier, date, concept, and amount. If the document contains multiple invoices, return an array of objects, one for each invoice.
+  For each invoice, you must extract the following fields:
+  - proveedor: The name of the supplier or vendor.
+  - fecha: The date of the invoice, formatted as YYYY-MM-DD.
+  - concepto: A short description of the invoice purpose or main items.
+  - importe: The total numerical amount of the invoice.
 
-  Invoice: {{media url=pdfDataUri}}`,
+  **CRITICAL INSTRUCTIONS**:
+  1.  If you cannot determine the value for a field with high confidence:
+      - For 'proveedor', 'fecha', or 'concepto' (string fields), you MUST return an empty string ("").
+      - For 'importe' (a number field), you MUST return the number 0.
+      - For each field you could not confidently extract, you MUST add its name (e.g., "proveedor", "fecha") to the 'missingFields' array.
+  2.  The final output MUST be a valid JSON object following the specified output schema.
+  3.  If the document contains no invoices, or if you encounter any errors preventing extraction, you MUST return an object with an empty array: { "facturas": [] }.
+  4.  Return all found invoices in the 'facturas' array.
+
+  Document to process: {{media url=pdfDataUri}}`,
+  config: {
+    // Using a more powerful model for better accuracy on complex documents.
+    model: 'googleai/gemini-1.5-pro', 
+  }
 });
 
 const extractInvoiceDataFlow = ai.defineFlow(
@@ -51,8 +74,15 @@ const extractInvoiceDataFlow = ai.defineFlow(
     inputSchema: ExtractInvoiceDataInputSchema,
     outputSchema: ExtractInvoiceDataOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
+  async (input) => {
+    try {
+      const { output } = await prompt(input);
+      // Ensure we always return an object with a 'facturas' array, even if the model returns null/undefined.
+      return output || { facturas: [] };
+    } catch (error) {
+      console.error("Error in extractInvoiceDataFlow:", error);
+      // On any exception, return the safe, empty structure.
+      return { facturas: [] };
+    }
   }
 );

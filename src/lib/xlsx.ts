@@ -5,15 +5,12 @@ import * as XLSX from "xlsx";
 
 export function exportToExcel(invoices: Invoice[]) {
   const dataToExport = invoices.map((invoice) => ({
-    Proveedor: invoice.supplier.value,
-    Fecha: invoice.date.value,
-    Concepto: invoice.concept.value,
-    Importe: invoice.amount.value,
+    Proveedor: invoice.proveedor,
+    Fecha: invoice.fecha,
+    Concepto: invoice.concepto,
+    Importe: invoice.importe,
     Archivo: invoice.fileName,
-    "Proveedor Incierto": invoice.supplier.uncertain,
-    "Fecha Incierta": invoice.date.uncertain,
-    "Concepto Incierto": invoice.concept.uncertain,
-    "Importe Incierto": invoice.amount.uncertain,
+    "Campos Faltantes": invoice.missingFields?.join(', ') || '',
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -27,6 +24,7 @@ export function exportToExcel(invoices: Invoice[]) {
     { wch: 50 }, // Concepto
     { wch: 15 }, // Importe
     { wch: 30 }, // Archivo
+    { wch: 30 }, // Campos Faltantes
   ];
   
   // Trigger file download
